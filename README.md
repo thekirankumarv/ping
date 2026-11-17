@@ -2,7 +2,7 @@
 
 Private chat for a few people. No phone number, no name, no email: connect by code, link or QR. Chats live on the phone, everything that crosses the network is end-to-end encrypted, and the whole thing runs on free tiers.
 
-Android only. Grab the APK from [Releases](https://github.com/thekirankumarv/ping/releases).
+Android only. Build the APK yourself with the steps below.
 
 ## Features
 
