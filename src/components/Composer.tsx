@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ComponentRef } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, { Easing, FadeIn, FadeInDown, FadeOut, FadeOutDown, LinearTransition, useAnimatedStyle, ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { summary, type Msg } from '../lib/core';
@@ -210,11 +210,6 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(p, r
   return (
     <Animated.View style={[{ paddingTop: 6, backgroundColor: t.bg }, pad]}>
       {banner}
-      {tools && (
-        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={{ marginBottom: 4 }}>
-          {toolbar}
-        </Animated.View>
-      )}
       <Animated.View layout={LinearTransition.duration(200)} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, paddingHorizontal: 8 }}>
         {rec.mode !== 'idle' ? (
           <RecordingBar r={rec} />
@@ -323,6 +318,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(p, r
           </Pressable>
         )}
       </Animated.View>
+      {/* Below the input so Android's cut/copy/paste bar, which floats above the selection, never covers it. */}
+      {tools && (
+        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={{ marginTop: 4 }}>
+          {toolbar}
+        </Animated.View>
+      )}
 
       <Sheet visible={sheet === 'menu'} onClose={() => setSheet(null)} title="Send options">
         {row('Send without sound', () => (setSheet(null), send({ quiet: true })), 'notifications-off-outline')}
@@ -371,7 +372,7 @@ function BigEditor(p: {
   const [tab, setTab] = useState<'write' | 'preview'>('write');
   return (
     <Modal visible={p.visible} animationType="slide" onRequestClose={p.onClose} statusBarTranslucent>
-      <View style={{ flex: 1, backgroundColor: t.bg, paddingTop: ins.top + 6 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: t.bg, paddingTop: ins.top + 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 8 }}>
           <IconBtn name="chevron-down" label="Close editor" onPress={p.onClose} />
           <View style={{ flex: 1 }}>
@@ -394,6 +395,10 @@ function BigEditor(p: {
         </View>
         {tab === 'write' ? (
           <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: t.line, paddingVertical: 6, marginTop: 6 }}>
+              <View style={{ flex: 1 }}>{p.toolbar}</View>
+              <Text style={{ color: t.dim, fontSize: 11.5, paddingHorizontal: 12 }}>{p.value.length}</Text>
+            </View>
             <TextInput
               autoFocus
               value={p.value}
@@ -407,17 +412,13 @@ function BigEditor(p: {
               selectionColor={t.accent}
               style={{ flex: 1, color: t.text, fontSize: 15.5, lineHeight: 22, padding: 18, fontFamily: p.value.includes('```') ? MONO : undefined }}
             />
-            <View style={{ borderTopWidth: 1, borderColor: t.line, paddingVertical: 6, paddingBottom: ins.bottom + 6 }}>
-              {p.toolbar}
-              <Text style={{ color: t.dim, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14 }}>{p.value.length} characters</Text>
-            </View>
           </>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: ins.bottom + 40 }}>
             {p.value.trim() ? <Markdown src={p.value} color={t.text} sub={t.sub} /> : <Text style={{ color: t.dim }}>Nothing to preview</Text>}
           </ScrollView>
         )}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -2,7 +2,7 @@
   "expo": {
     "name": "PING",
     "slug": "ping",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
       },
       "package": "com.kiran.ping",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 2,
+      "versionCode": 3,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
