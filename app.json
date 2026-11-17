@@ -1,0 +1,115 @@
+{
+  "expo": {
+    "name": "PING",
+    "slug": "ping",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "ping",
+    "backgroundColor": "#07080C",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#07080C",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "package": "com.kiran.ping",
+      "versionCode": 1,
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_EXACT_ALARM"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 96,
+          "resizeMode": "contain",
+          "backgroundColor": "#07080C"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": [
+              "arm64-v8a"
+            ],
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class org.webrtc.** { *; }\n-dontwarn org.webrtc.**\n-keep class com.zxcpoiu.incallmanager.** { *; }"
+          }
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "PING uses the camera to scan a friend’s QR code, take photos and make video calls.",
+          "microphonePermission": "PING uses the microphone for voice notes and calls.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#C6FF3A"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "PING uses Face ID to unlock the app."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "PING uses the microphone for voice notes and calls."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PING lets you pick photos to send.",
+          "cameraPermission": "PING uses the camera to take photos to send."
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "PING uses the camera for video calls.",
+          "microphonePermission": "PING uses the microphone for calls."
+        }
+      ],
+      "./plugins/release-signing"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
