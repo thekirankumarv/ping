@@ -7,7 +7,8 @@ import { mediaDevices, MediaStream, RTCIceCandidate, RTCPeerConnection, RTCSessi
 import { create } from 'zustand';
 import * as core from './core';
 import { randomBytes } from './crypto';
-import { handleSignals, signal } from './relay';
+import { sendPush } from './push';
+import { handleSignals, signal, useNet } from './relay';
 import { duration } from './time';
 
 type Sig =
@@ -111,6 +112,7 @@ export async function startCall(peer: string, video: boolean) {
     InCallManager.start({ media: video ? 'video' : 'audio', ringback: '_DTMF_' });
     InCallManager.setForceSpeakerphoneOn(video);
     if (!signal(peer, core.sealFor(peer, { t: 'offer', cid, sdp: o.sdp, video } satisfies Sig))) return finish('Not reachable', true);
+    if (!useNet.getState().online[peer]) sendPush(core.contact(peer)?.push, core.myId(), video ? 'Incoming video call' : 'Incoming call');
     timer = setTimeout(() => finish(get().phase === 'ringing' ? 'No answer' : 'Not reachable', true), RING_MS);
   } catch (e) {
     finish(e instanceof Error && (e.message === 'mic' || e.message === 'camera') ? 'Permission needed' : 'Couldn’t start call', true);
@@ -202,6 +204,7 @@ async function onSig(peer: string, box: string) {
   const c = get();
   if (s.t === 'offer') {
     if (core.contact(peer)?.state !== 'ok') return;
+    if (s.cid === c.cid) return;
     if (c.phase !== 'idle' && c.phase !== 'ended') return signal(peer, core.sealFor(peer, { t: 'end', cid: s.cid, why: 'busy' } satisfies Sig));
     offer = s.sdp;
     pending = [];
@@ -219,6 +222,7 @@ async function onSig(peer: string, box: string) {
       if (c.phase === 'calling') set({ phase: 'ringing' });
       break;
     case 'answer':
+      InCallManager.stopRingback();
       set({ phase: 'connecting' });
       await pc?.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: s.sdp }));
       await flushIce();
@@ -233,4 +237,17 @@ async function onSig(peer: string, box: string) {
   }
 }
 
-export const startCalls = () => handleSignals((peer, box) => void onSig(peer, box));
+// A closed phone misses the first offer; resend it, with gathered candidates, once the push brings it online.
+function reoffer(online: Record<string, boolean>, before: Record<string, boolean>) {
+  const c = get();
+  const sdp = pc?.localDescription?.sdp;
+  if (c.phase !== 'calling' || !sdp || !online[c.peer] || before[c.peer]) return;
+  send({ t: 'offer', cid: c.cid, sdp, video: c.video });
+  clearTimeout(timer);
+  timer = setTimeout(() => finish(get().phase === 'ringing' ? 'No answer' : 'Not reachable', true), RING_MS);
+}
+
+export function startCalls() {
+  handleSignals((peer, box) => void onSig(peer, box));
+  useNet.subscribe((s, prev) => reoffer(s.online, prev.online));
+}

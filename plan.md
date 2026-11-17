@@ -240,6 +240,7 @@ Built and tested on the emulator against a live test peer:
 - Phase 2: photos (compressed, blurred thumb first), documents up to 20 MB, voice notes (hold or tap-to-lock, waveform, 1×/1.5×/2×), view-once photos (screenshots blocked, closes after 10 s), YouTube and Shorts in an in-app player, Instagram embeds, sender-side link previews, pins, starred, media gallery, drafts, scheduled send, silent send, local reminders, notes to self, per-chat colour and wallpaper, per-chat screenshot block, storage screen, encrypted backup and restore.
 - Stories: photo or text, 24 hours, sent to every contact, "seen by" list, ring on avatars in the chat list, chat header and profile.
 - Phase 3: voice and video calls over WebRTC with encrypted signalling, mute, speaker, camera on/off, flip, call log.
+- Push: Firebase project `ping-5a793` (Spark plan) and EAS project `@kirankumarv/ping`, FCM V1 key uploaded to Expo. A closed PING gets "New message" and "Incoming call" notifications; the caller resends the offer when the other side comes online.
 
 Not built:
 
@@ -250,4 +251,4 @@ Not built:
 
 ## 13. Open items
 
-1. Firebase project for FCM plus an EAS project id, so messages and calls ring while PING is closed. Until then they arrive when PING is open.
+1. Incoming calls on a closed phone show a notification, not a full-screen ringing screen; tapping it opens PING and the call rings.

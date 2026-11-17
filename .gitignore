@@ -54,3 +54,6 @@ playwright-report/
 
 # Local Expo module build output
 modules/*/android/build/
+
+# Firebase config, added locally
+google-services.json

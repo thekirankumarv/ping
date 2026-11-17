@@ -43,6 +43,7 @@ Android only. Grab the APK from [Releases](https://github.com/thekirankumarv/pin
 - **Messages:** sealed with XChaCha20-Poly1305 using a key derived from both parties' keys (X25519 + HKDF). Supabase only holds encrypted rows in a queue until the other phone picks them up, then deletes them.
 - **Media:** each file is encrypted with its own random key, uploaded to a private storage bucket, and the key travels inside the encrypted message. The receiver downloads, decrypts and deletes the remote copy.
 - **Calls:** WebRTC with Google STUN. Signalling goes over an encrypted Supabase Realtime channel.
+- **Notifications:** content-free "New message" / "Incoming call" pushes through Expo and Firebase Cloud Messaging. Push tokens are exchanged inside the encrypted channel.
 - **Storage:** chats, contacts and stories live in SQLite on the phone.
 - **Backup:** PBKDF2-SHA256 + XChaCha20-Poly1305. Contains identity, contacts and messages; photos and files are not included.
 
@@ -65,7 +66,8 @@ plan.md           full feature plan, status and open items
 
 1. Create a Supabase project, enable anonymous sign-ins and run `supabase/schema.sql` in the SQL editor.
 2. Put your project URL and publishable key in `src/lib/relay.ts`.
-3. Install and run on a device or emulator:
+3. For notifications while the app is closed: create a Firebase project, add an Android app with your package name, put its `google-services.json` in the project root, run `npx eas init`, and upload a Firebase service account key with `npx eas credentials -p android` (Google Service Account → FCM V1).
+4. Install and run on a device or emulator:
 
 ```bash
 npm install
@@ -101,7 +103,7 @@ npm run lint
 
 ## Limits
 
-- Messages and calls arrive only while the app is open until push (Firebase Cloud Messaging) is configured.
+- On a closed phone an incoming call shows as a notification; tapping it opens PING and the call rings.
 - No TURN server, so calls may fail on strict corporate or carrier networks.
 - Restoring a backup moves the account; the old phone should uninstall PING.
 

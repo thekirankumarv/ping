@@ -31,11 +31,11 @@ export async function registerPush(): Promise<string | null> {
 }
 
 // Content-free on purpose: the message itself stays encrypted in the relay.
-export function sendPush(to: string | null | undefined, chat: string) {
+export function sendPush(to: string | null | undefined, chat: string, body = 'New message') {
   if (!to) return;
   fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ to, title: 'PING', body: 'New message', channelId: 'messages', priority: 'high', sound: 'default', data: { chat } }),
+    body: JSON.stringify({ to, title: 'PING', body, channelId: 'messages', priority: 'high', sound: 'default', data: { chat } }),
   }).catch(() => {});
 }

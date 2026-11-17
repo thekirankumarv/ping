@@ -2,7 +2,7 @@
   "expo": {
     "name": "PING",
     "slug": "ping",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,8 @@
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "package": "com.kiran.ping",
-      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 2,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
@@ -110,6 +111,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "28b66e58-22dd-4226-812b-979d4e0264b9"
+      }
+    },
+    "owner": "kirankumarv"
   }
 }
