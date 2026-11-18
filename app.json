@@ -110,7 +110,8 @@
           "microphonePermission": "PING uses the microphone for calls."
         }
       ],
-      "./plugins/release-signing"
+      "./plugins/release-signing",
+      "./plugins/keep-sounds"
     ],
     "experiments": {
       "typedRoutes": true
