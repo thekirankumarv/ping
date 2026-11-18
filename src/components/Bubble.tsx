@@ -101,7 +101,8 @@ export const Bubble = memo(function Bubble(p: Props) {
   const corners = mine
     ? { borderTopRightRadius: p.joinTop ? r : R, borderBottomRightRadius: p.joinBottom ? r : R }
     : { borderTopLeftRadius: p.joinTop ? r : R, borderBottomLeftRadius: p.joinBottom ? r : R };
-  const ink: Ink = { fg, sub, strong, on };
+  const hold = () => (haptic.medium(), p.onMenu(m));
+  const ink: Ink = { fg, sub, strong, on, hold };
   const tight = m.kind === 'image' && !m.once && !m.gone;
   const mediaW = Math.min(screen * 0.68, 280);
   const long = m.body.length > LONG || m.body.split('\n').length > 24;
@@ -129,7 +130,7 @@ export const Bubble = memo(function Bubble(p: Props) {
       <GestureDetector gesture={pan}>
         <Animated.View style={[{ alignItems: mine ? 'flex-end' : 'flex-start' }, slide]}>
           <Pressable
-            onLongPress={() => (haptic.medium(), p.onMenu(m))}
+            onLongPress={hold}
             delayLongPress={260}
             style={({ pressed }) => [
               {
@@ -152,6 +153,8 @@ export const Bubble = memo(function Bubble(p: Props) {
             {p.quoted !== undefined && m.reply && (
               <Pressable
                 onPress={() => p.onJump(m.reply!)}
+                onLongPress={hold}
+                delayLongPress={260}
                 style={{
                   flexDirection: 'row',
                   gap: 8,
@@ -197,7 +200,7 @@ export const Bubble = memo(function Bubble(p: Props) {
               </View>
             )}
             {long && !m.gone && (
-              <Pressable onPress={() => router.push(`/read/${m.id}`)} hitSlop={6} style={{ paddingTop: 6 }}>
+              <Pressable onPress={() => router.push(`/read/${m.id}`)} onLongPress={hold} delayLongPress={260} hitSlop={6} style={{ paddingTop: 6 }}>
                 <Text style={{ color: strong, fontWeight: '800', fontSize: 14 }}>Read more</Text>
               </Pressable>
             )}

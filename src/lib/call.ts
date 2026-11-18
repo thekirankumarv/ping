@@ -7,7 +7,7 @@ import { mediaDevices, MediaStream, RTCIceCandidate, RTCPeerConnection, RTCSessi
 import { create } from 'zustand';
 import * as core from './core';
 import { randomBytes } from './crypto';
-import { sendPush } from './push';
+import { clearCallAlerts, sendPush } from './push';
 import { handleSignals, signal, useNet } from './relay';
 import { duration } from './time';
 
@@ -112,7 +112,7 @@ export async function startCall(peer: string, video: boolean) {
     InCallManager.start({ media: video ? 'video' : 'audio', ringback: '_DTMF_' });
     InCallManager.setForceSpeakerphoneOn(video);
     if (!signal(peer, core.sealFor(peer, { t: 'offer', cid, sdp: o.sdp, video } satisfies Sig))) return finish('Not reachable', true);
-    if (!useNet.getState().online[peer]) sendPush(core.contact(peer)?.push, core.myId(), video ? 'Incoming video call' : 'Incoming call');
+    if (!useNet.getState().online[peer]) sendPush(core.contact(peer)?.push, core.myId(), video ? 'Incoming video call' : 'Incoming call', 'calls');
     timer = setTimeout(() => finish(get().phase === 'ringing' ? 'No answer' : 'Not reachable', true), RING_MS);
   } catch (e) {
     finish(e instanceof Error && (e.message === 'mic' || e.message === 'camera') ? 'Permission needed' : 'Couldn’t start call', true);
@@ -189,6 +189,7 @@ function finish(note: string, tell: boolean, why: 'hangup' | 'decline' | 'busy' 
   InCallManager.stopRingtone();
   InCallManager.stop();
   Vibration.cancel();
+  void clearCallAlerts();
   if (c.peer) log(c, note);
   set({ phase: 'ended', note, local: null, remote: null });
   setTimeout(() => get().phase === 'ended' && set(IDLE), 1500);
@@ -210,6 +211,7 @@ async function onSig(peer: string, box: string) {
     pending = [];
     set({ ...IDLE, phase: 'incoming', cid: s.cid, peer, video: s.video, outgoing: false, speaker: s.video });
     signal(peer, core.sealFor(peer, { t: 'ring', cid: s.cid } satisfies Sig));
+    void clearCallAlerts();
     InCallManager.startRingtone('_DEFAULT_', [0, 600, 900], 'playback', 40);
     Vibration.vibrate([0, 600, 900], true);
     timer = setTimeout(() => finish('Missed', false), RING_MS);

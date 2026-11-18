@@ -14,9 +14,10 @@ import { findCode } from '../lib/relay';
 import { DISPLAY, useT } from '../lib/theme';
 
 const ease = Easing.out(Easing.cubic);
-const link = (code: string) => `ping://add?code=${code}`;
+// https so messaging apps make it tappable; the page at docs/index.html opens the app.
+const link = (code: string) => `https://thekirankumarv.github.io/ping/?code=${code}`;
 const pretty = (code: string) => `${code.slice(0, 4)} ${code.slice(4)}`;
-// Accepts a bare code, "ABCD EFGH", or a ping:// link.
+// Accepts a bare code, "ABCD EFGH", or a share link (https or ping://).
 const extract = (s: string) => {
   const m = /code=([A-Za-z0-9]{8})/.exec(s);
   const c = (m?.[1] ?? s).replace(/[\s-]/g, '').toUpperCase();

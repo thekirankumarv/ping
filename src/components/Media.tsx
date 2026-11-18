@@ -14,7 +14,8 @@ import { useT } from '../lib/theme';
 import { cycleRate, seek, toggle, useVoice } from '../lib/voice';
 import { notify, tap } from './ui';
 
-export type Ink = { fg: string; sub: string; strong: string; on: boolean };
+// hold: inner Pressables take the touch, so they pass long-press on to open the message menu.
+export type Ink = { fg: string; sub: string; strong: string; on: boolean; hold?: () => void };
 
 const thumbUri = (b?: string) => (b ? `data:image/jpeg;base64,${b}` : undefined);
 
@@ -32,7 +33,13 @@ function Pending({ m, ink }: { m: core.Msg; ink: Ink }) {
   const x = core.metaOf(m);
   if (m.mine && x.failed)
     return (
-      <Pressable onPress={() => (tap(), retry(m.id))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} hitSlop={8}>
+      <Pressable
+        onLongPress={ink.hold}
+        delayLongPress={260}
+        onPress={() => (tap(), retry(m.id))}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+        hitSlop={8}
+      >
         <Ionicons name="refresh-circle" size={22} color={ink.strong} />
         <Text style={{ color: ink.strong, fontWeight: '800', fontSize: 13 }}>Retry</Text>
       </Pressable>
@@ -50,6 +57,8 @@ export function ImageBody({ m, ink, width }: { m: core.Msg; ink: Ink; width: num
   const missing = x.cleared || (!x.local && !busy);
   return (
     <Pressable
+      onLongPress={ink.hold}
+      delayLongPress={260}
       onPress={() => x.local && router.push(`/media/${m.id}`)}
       style={{ width, height: h, borderRadius: 16, overflow: 'hidden', backgroundColor: t.surface2 }}
     >
@@ -85,6 +94,8 @@ export function OnceBody({ m, ink }: { m: core.Msg; ink: Ink }) {
   const label = x.opened ? 'Opened' : m.mine ? 'Photo' : x.local ? 'Tap to view' : 'Photo';
   return (
     <Pressable
+      onLongPress={ink.hold}
+      delayLongPress={260}
       disabled={m.mine === 1 || !x.local || x.opened}
       onPress={() => router.push(`/media/${m.id}`)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, paddingRight: 6 }}
@@ -114,6 +125,8 @@ export function FileBody({ m, ink }: { m: core.Msg; ink: Ink }) {
   const ext = (x.name?.split('.').pop() ?? 'file').slice(0, 4).toUpperCase();
   return (
     <Pressable
+      onLongPress={ink.hold}
+      delayLongPress={260}
       onPress={() => x.local && openFile(x.local, x.mime)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4, minWidth: 220 }}
     >
@@ -156,6 +169,8 @@ export function VoiceBody({ m, ink }: { m: core.Msg; ink: Ink }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, width: 236, paddingVertical: 2 }}>
       <Pressable
+        onLongPress={ink.hold}
+        delayLongPress={260}
         disabled={!ready}
         onPress={() => x.local && toggle(m.id, x.local)}
         accessibilityLabel={playing ? 'Pause' : 'Play'}
@@ -176,6 +191,8 @@ export function VoiceBody({ m, ink }: { m: core.Msg; ink: Ink }) {
       </Pressable>
       <View style={{ flex: 1, gap: 4 }}>
         <Pressable
+          onLongPress={ink.hold}
+          delayLongPress={260}
           onPress={(e) => dur && seek(m.id, Math.max(0, Math.min(1, e.nativeEvent.locationX / 170)) * dur)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 28 }}
         >
@@ -195,6 +212,8 @@ export function VoiceBody({ m, ink }: { m: core.Msg; ink: Ink }) {
       </View>
       {me && (
         <Pressable
+          onLongPress={ink.hold}
+          delayLongPress={260}
           onPress={cycleRate}
           hitSlop={6}
           style={{ borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: ink.on ? 'rgba(0,0,0,0.16)' : ink.strong + '26' }}
@@ -244,7 +263,7 @@ export function LinkCard({ m, ink, width }: { m: core.Msg; ink: Ink; width: numb
 
   if (e?.type === 'youtube')
     return (
-      <Pressable onPress={() => router.push({ pathname: '/play', params: { url } })} style={card}>
+      <Pressable onLongPress={ink.hold} delayLongPress={260} onPress={() => router.push({ pathname: '/play', params: { url } })} style={card}>
         <View style={{ height: e.tall ? width * 1.15 : (width * 9) / 16, backgroundColor: '#000' }}>
           <YtThumb id={e.id} tall={e.tall} />
           <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
@@ -266,7 +285,7 @@ export function LinkCard({ m, ink, width }: { m: core.Msg; ink: Ink; width: numb
 
   if (e?.type === 'instagram')
     return (
-      <Pressable onPress={() => router.push({ pathname: '/play', params: { url } })} style={card}>
+      <Pressable onLongPress={ink.hold} delayLongPress={260} onPress={() => router.push({ pathname: '/play', params: { url } })} style={card}>
         <LinearGradient
           colors={['#FEDA75', '#D62976', '#4F5BD5']}
           start={{ x: 0, y: 1 }}
@@ -285,7 +304,7 @@ export function LinkCard({ m, ink, width }: { m: core.Msg; ink: Ink; width: numb
 
   if (!link?.title && !link?.thumb) return null;
   return (
-    <Pressable onPress={() => Linking.openURL(url)} style={card}>
+    <Pressable onLongPress={ink.hold} delayLongPress={260} onPress={() => Linking.openURL(url)} style={card}>
       {!!link.thumb && <Image source={{ uri: thumbUri(link.thumb) }} contentFit="cover" style={{ height: width * 0.5 }} />}
       {meta(link.title, link.site)}
       {!!link.desc && (

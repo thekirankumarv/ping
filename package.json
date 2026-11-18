@@ -1,6 +1,6 @@
 {
   "name": "ping",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Private chat for a few people. No phone number, no name; connect by code or QR. Chats live on the phone.",
   "license": "MIT",
   "private": true,
