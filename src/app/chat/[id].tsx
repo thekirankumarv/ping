@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -17,7 +18,7 @@ import { Composer, type ComposerHandle, type SendOpts } from '../../components/C
 import { MessageMenu } from '../../components/MessageMenu';
 import { TypingBubble } from '../../components/Typing';
 import { Wallpaper } from '../../components/Wallpaper';
-import { ask, Btn, goBack, haptic, IconBtn, notify, Sheet, tap, toast, type IconName } from '../../components/ui';
+import { ask, Btn, goBack, haptic, IconBtn, notify, Seg, Sheet, tap, toast, type IconName } from '../../components/ui';
 import * as core from '../../lib/core';
 import { useLive } from '../../lib/db';
 import { attachPreview, MAX_FILE, sendFile, sendImage, sendVoice } from '../../lib/media';
@@ -27,12 +28,11 @@ import { dayLabel, laterPicks, lastSeen, sameDay, TTLS, when } from '../../lib/t
 import { ChatPreset, DISPLAY, isPreset, useT } from '../../lib/theme';
 
 const JOIN_MS = 5 * 60_000;
-type Pick = 'photos' | 'camera' | 'doc' | 'once';
+type Pick = 'photos' | 'camera' | 'doc';
 const ATTACH: [IconName, string, string, Pick][] = [
   ['images', 'Photos', '#4F8BFF', 'photos'],
   ['camera', 'Camera', '#FF5F7A', 'camera'],
   ['document-text', 'Document', '#9B6BFF', 'doc'],
-  ['eye-off', 'View once', '#2EC4A6', 'once'],
 ];
 
 export default function ChatScreen() {
@@ -62,6 +62,9 @@ function Chat() {
   const [flash, setFlash] = useState<string>();
   const [sheet, setSheet] = useState<'timer' | 'attach' | 'remind' | null>(null);
   const [remindFor, setRemindFor] = useState<core.Msg | null>(null);
+  const [shots, setShots] = useState<string[]>([]);
+  const [hd, setHd] = useState<'sd' | 'hd'>('sd');
+  const [views, setViews] = useState<'0' | '1' | '2'>('0');
   const [pinAt, setPinAt] = useState(0);
   const [away, setAway] = useState(false);
   const [now, setNow] = useState(Date.now);
@@ -141,21 +144,29 @@ function Chat() {
     toBottom();
   };
 
-  const pickPhotos = async (once = false) => {
-    setSheet(null);
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: !once, selectionLimit: 10, quality: 1 });
-    if (r.canceled) return;
-    for (const a of r.assets) sendImage(id, a.uri, { ...opts(), once }).catch(() => notify('Couldn’t send that photo'));
+  // Picked or taken photos wait in a sheet to choose HD and view once / twice before sending.
+  const review = (uris: string[]) => {
+    setHd('sd');
+    setViews('0');
+    setShots(uris);
+  };
+  const sendShots = () => {
+    const once = shots.length === 1 ? (Number(views) as 0 | 1 | 2) : 0;
+    for (const uri of shots) sendImage(id, uri, { ...opts(), once, hd: hd === 'hd' }).catch(() => notify('Couldn’t send that photo'));
+    setShots([]);
     sent();
+  };
+  const pickPhotos = async () => {
+    setSheet(null);
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 10, quality: 1 });
+    if (!r.canceled) review(r.assets.map((a) => a.uri));
   };
   const camera = async () => {
     setSheet(null);
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return notify('Camera needed', 'Allow camera access in Settings to take photos.');
     const r = await ImagePicker.launchCameraAsync({ quality: 1 });
-    if (r.canceled) return;
-    sendImage(id, r.assets[0].uri, opts()).catch(() => notify('Couldn’t send that photo'));
-    sent();
+    if (!r.canceled) review([r.assets[0].uri]);
   };
   const doc = async () => {
     setSheet(null);
@@ -168,7 +179,7 @@ function Chat() {
       notify('Couldn’t open that file');
     }
   };
-  const attach = (k: Pick) => (k === 'photos' ? pickPhotos() : k === 'camera' ? camera() : k === 'doc' ? doc() : pickPhotos(true));
+  const attach = (k: Pick) => (k === 'photos' ? pickPhotos() : k === 'camera' ? camera() : doc());
   const pin = pins[pinAt % Math.max(1, pins.length)];
 
   return (
@@ -368,6 +379,7 @@ function Chat() {
             }}
             onEdit={(mid, body) => core.edit(mid, body)}
             onAttach={() => setSheet('attach')}
+            onCamera={camera}
             onVoice={(uri, dur, wave) => {
               sendVoice(id, uri, dur, wave, opts());
               sent();
@@ -418,8 +430,43 @@ function Chat() {
         onDeleteAll={(m) => core.deleteForEveryone(m.id)}
       />
 
+      <Sheet visible={shots.length > 0} onClose={() => setShots([])} title={shots.length > 1 ? `Send ${shots.length} photos` : 'Send photo'}>
+        <View style={{ gap: 14, paddingTop: 4 }}>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            {shots.map((uri) => (
+              <Image
+                key={uri}
+                source={{ uri }}
+                contentFit="cover"
+                style={{ width: shots.length > 1 ? 72 : 140, height: shots.length > 1 ? 72 : 140, borderRadius: 14 }}
+              />
+            ))}
+          </View>
+          <Seg<'sd' | 'hd'>
+            options={[
+              ['sd', 'Standard'],
+              ['hd', 'HD'],
+            ]}
+            value={hd}
+            onChange={setHd}
+          />
+          {shots.length === 1 && !self && (
+            <Seg<'0' | '1' | '2'>
+              options={[
+                ['0', 'Normal'],
+                ['1', 'View once'],
+                ['2', 'View twice'],
+              ]}
+              value={views}
+              onChange={setViews}
+            />
+          )}
+          <Btn label="Send" icon="send" onPress={sendShots} />
+        </View>
+      </Sheet>
+
       <Sheet visible={sheet === 'attach'} onClose={() => setSheet(null)}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 8 }}>
           {ATTACH.map(([icon, label, color, k], i) => (
             <Animated.View key={label} entering={FadeInDown.delay(i * 40).duration(220)} style={{ alignItems: 'center', gap: 8, width: '24%' }}>
               <Pressable

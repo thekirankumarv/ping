@@ -82,7 +82,8 @@ export default function CallScreen() {
   const [now, setNow] = useState(Date.now);
 
   useEffect(() => {
-    if (useCall.getState().phase === 'idle') startCall(id, video === '1');
+    const { phase } = useCall.getState();
+    if (phase === 'idle' || phase === 'ended') startCall(id, video === '1');
   }, [id, video]);
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);

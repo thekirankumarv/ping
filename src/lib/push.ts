@@ -49,8 +49,15 @@ export function sendPush(to: string | null | undefined, chat: string, body = 'Ne
   }).catch(() => {});
 }
 
-// Dismissing the call notification stops its ringtone once the app rings, answers or hangs up itself.
-export async function clearCallAlerts() {
-  const shown = await Notifications.getPresentedNotificationsAsync().catch(() => []);
-  for (const n of shown) if (n.request.content.data?.call) Notifications.dismissNotificationAsync(n.request.identifier).catch(() => {});
+// The native ringer (plugins/call-ring.js) posts the call alert; dismissing it stops the ringtone.
+export const clearCallAlerts = () => Notifications.dismissNotificationAsync('expo-notifications://foreign_notifications?tag=ping-call&id=1').catch(() => {});
+
+// Stops the closed phone ringing when the caller gives up first.
+export function hushPush(to: string | null | undefined, chat: string) {
+  if (!to) return;
+  fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ to, priority: 'high', data: { chat, hush: true } }),
+  }).catch(() => {});
 }

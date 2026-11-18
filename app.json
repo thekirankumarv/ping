@@ -2,7 +2,7 @@
   "expo": {
     "name": "PING",
     "slug": "ping",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
       },
       "package": "com.kiran.ping",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 4,
+      "versionCode": 5,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
@@ -25,7 +25,8 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.USE_BIOMETRIC",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.USE_EXACT_ALARM"
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.USE_FULL_SCREEN_INTENT"
       ],
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -111,7 +112,8 @@
         }
       ],
       "./plugins/release-signing",
-      "./plugins/keep-sounds"
+      "./plugins/keep-sounds",
+      "./plugins/call-ring"
     ],
     "experiments": {
       "typedRoutes": true

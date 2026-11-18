@@ -91,7 +91,18 @@ export function ImageBody({ m, ink, width }: { m: core.Msg; ink: Ink; width: num
 
 export function OnceBody({ m, ink }: { m: core.Msg; ink: Ink }) {
   const x = core.metaOf(m);
-  const label = x.opened ? 'Opened' : m.mine ? 'Photo' : x.local ? 'Tap to view' : 'Photo';
+  const left = m.once - (x.views ?? 0);
+  const label = x.opened
+    ? 'Opened'
+    : m.mine
+      ? m.once === 2
+        ? 'Photo · view twice'
+        : 'Photo'
+      : x.local
+        ? m.once === 2
+          ? `Tap to view · ${left} left`
+          : 'Tap to view'
+        : 'Photo';
   return (
     <Pressable
       onLongPress={ink.hold}
@@ -112,7 +123,7 @@ export function OnceBody({ m, ink }: { m: core.Msg; ink: Ink }) {
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: ink.strong, fontWeight: '900', fontSize: 13 }}>1</Text>
+        <Text style={{ color: ink.strong, fontWeight: '900', fontSize: 13 }}>{m.once}</Text>
       </View>
       <Text style={{ color: x.opened ? ink.sub : ink.fg, fontSize: 15, fontWeight: '700', fontStyle: x.opened ? 'italic' : 'normal' }}>{label}</Text>
       <Pending m={m} ink={ink} />

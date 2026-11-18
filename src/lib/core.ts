@@ -24,6 +24,7 @@ export type Contact = {
   theme: string | null;
   wall: string | null;
   shots: 0 | 1;
+  hide: 0 | 1;
 };
 export type Kind = 'text' | 'sys' | 'call' | 'image' | 'file' | 'voice';
 export type Link = { url: string; title?: string; desc?: string; site?: string; thumb?: string };
@@ -41,6 +42,7 @@ export type Meta = {
   key?: string;
   local?: string;
   opened?: boolean;
+  views?: number;
   failed?: boolean;
   cleared?: boolean;
   link?: Link;
@@ -63,11 +65,12 @@ export type Msg = {
   reacts: string;
   star: 0 | 1;
   meta: string | null;
-  once: 0 | 1;
+  // Views allowed: 0 unlimited, 1 view once, 2 view twice.
+  once: 0 | 1 | 2;
   pin: 0 | 1;
 };
 
-type Wire = { kind?: Kind; meta?: Meta; once?: 1; quiet?: 1 };
+type Wire = { kind?: Kind; meta?: Meta; once?: 1 | 2; quiet?: 1 };
 export type Ev =
   | { t: 'hi'; push?: string | null }
   | { t: 'ok'; push?: string | null }
@@ -121,6 +124,7 @@ const COLUMNS: Record<string, [string, string][]> = {
     ['theme', 'text'],
     ['wall', 'text'],
     ['shots', 'integer not null default 0'],
+    ['hide', 'integer not null default 0'],
   ],
   messages: [
     ['meta', 'text'],
@@ -205,6 +209,12 @@ export function chats(): ChatRow[] {
     .map((c) => ({ ...c, last: db.get<Msg>('select * from messages where chat = ? order by ts desc, rowid desc limit 1', c.id) ?? null, unread: unread(c.id) }))
     .sort((a, b) => (b.last?.ts ?? b.created) - (a.last?.ts ?? a.created));
 }
+// Who gets new stories: connected contacts not hidden from them.
+export const storyAudience = () => connected().filter((id) => !contact(id)?.hide);
+export function setStoryHidden(id: string, hide: boolean) {
+  db.run('update contacts set hide = ? where id = ?', hide ? 1 : 0, id);
+  changed(id);
+}
 export const connected = () => db.all<{ id: string }>("select id from contacts where state = 'ok' and id != ?", me.id).map((r) => r.id);
 export const blocked = () => db.all<Contact>("select * from contacts where state = 'blocked'");
 export const starred = (chat: string) => db.all<Msg>('select * from messages where chat = ? and star = 1 order by ts desc', chat);
@@ -255,7 +265,7 @@ export function summary(m: Msg) {
   const cap = m.body ? ` · ${plain(m.body)}` : '';
   switch (m.kind) {
     case 'image':
-      return m.once ? '📷 View once photo' : `📷 Photo${cap}`;
+      return m.once ? `📷 View ${m.once === 2 ? 'twice' : 'once'} photo` : `📷 Photo${cap}`;
     case 'file':
       return `📄 ${x.name ?? 'File'}${cap}`;
     case 'voice':
@@ -347,7 +357,7 @@ function sys(chat: string, body: string, kind: Kind = 'sys', mine = 0) {
 }
 export const logCall = (chat: string, body: string, mine: boolean) => sys(chat, body, 'call', mine ? 1 : 0);
 
-type SendOpts = { reply?: string | null; ttl?: number; quiet?: boolean; at?: number; once?: boolean };
+type SendOpts = { reply?: string | null; ttl?: number; quiet?: boolean; at?: number; once?: 0 | 1 | 2 };
 
 function insertMine(chat: string, kind: Kind, body: string, meta: Meta | null, o: SendOpts) {
   const c = contact(chat);
@@ -365,7 +375,7 @@ function insertMine(chat: string, kind: Kind, body: string, meta: Meta | null, o
     m.ts,
     self ? 3 : 0,
     meta ? JSON.stringify(meta) : null,
-    o.once ? 1 : 0,
+    o.once ?? 0,
   );
   return m;
 }
@@ -402,7 +412,7 @@ export function shipMedia(id: string, remote: { path: string; key: string }, qui
     ts: m.ts,
     kind: m.kind,
     meta: { ...meta, ...remote },
-    ...(m.once ? { once: 1 as const } : {}),
+    ...(m.once ? { once: m.once } : {}),
     ...(quiet ? { quiet: 1 as const } : {}),
   });
 }
@@ -418,8 +428,11 @@ export function setLink(id: string, link: Link) {
 
 export function openOnce(id: string) {
   const m = message(id);
-  if (!m?.once || m.mine || metaOf(m).opened) return;
-  patchMeta(id, { local: undefined, thumb: undefined, opened: true });
+  const x = m && metaOf(m);
+  if (!m?.once || m.mine || x!.opened) return;
+  const views = (x!.views ?? 0) + 1;
+  if (views < m.once) return patchMeta(id, { views });
+  patchMeta(id, { local: undefined, thumb: undefined, opened: true, views });
   send(m.chat, { t: 'o', id });
 }
 
@@ -549,7 +562,7 @@ export function addStory(kind: StoryKind, body: string, meta: Meta) {
     ts,
     ts + DAY,
   );
-  if (kind === 'text') for (const peer of connected()) shipStory(id, peer);
+  if (kind === 'text') for (const peer of storyAudience()) shipStory(id, peer);
   changed(STORIES);
   return id;
 }
@@ -667,7 +680,7 @@ function apply(from: string, pub: string, ev: Ev): string | void {
           ev.ttl,
           ev.ts,
           ev.meta ? JSON.stringify({ ...ev.meta, local: undefined }) : null,
-          ev.once ? 1 : 0,
+          ev.once === 2 ? 2 : ev.once ? 1 : 0,
         );
       changed(from);
       return ev.id;

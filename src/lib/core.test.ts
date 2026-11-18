@@ -144,7 +144,7 @@ const both = async () => {
   as(B, () => assert.equal(core.localFiles().size, 0, 'deleted media frees the file'));
 
   // View once: opened once, sender is told, nothing left to reopen.
-  const vo = as(A, () => core.addMedia('bob', 'image', { local: 'file:///c.jpg' }, { once: true, ttl: 0 }))!;
+  const vo = as(A, () => core.addMedia('bob', 'image', { local: 'file:///c.jpg' }, { once: 1, ttl: 0 }))!;
   as(A, () => core.shipMedia(vo, { path: 'bob/y', key: 'k' }));
   as(A, () => assert.equal(core.localFiles().size, 0, 'sender keeps no copy'));
   await both();
@@ -156,6 +156,18 @@ const both = async () => {
   });
   await both();
   as(A, () => assert.equal(core.metaOf(core.message(vo)!).opened, true));
+
+  // View twice: first open keeps the photo, second removes it.
+  const vt = as(A, () => core.addMedia('bob', 'image', { local: 'file:///e.jpg' }, { once: 2, ttl: 0 }))!;
+  as(A, () => core.shipMedia(vt, { path: 'bob/z', key: 'k' }));
+  await both();
+  as(B, () => {
+    core.setLocal(vt, 'file:///f.jpg');
+    core.openOnce(vt);
+    assert.equal(core.metaOf(core.message(vt)!).local, 'file:///f.jpg', 'still there after one view');
+    core.openOnce(vt);
+    assert.equal(core.metaOf(core.message(vt)!).opened, true);
+  });
 
   // Pins sync; scheduled messages wait for their time; silent ones skip push.
   as(B, () => core.pin(list));
@@ -198,6 +210,12 @@ const both = async () => {
   as(A, () => core.deleteStory(pic2));
   await both();
   as(B, () => assert.equal(core.storiesOf('alice').length, 1));
+  // Hidden contacts don't get new stories.
+  as(A, () => core.setStoryHidden('bob', true));
+  as(A, () => core.addStory('text', 'not for bob', {}));
+  await both();
+  as(B, () => assert.equal(core.storiesOf('alice').length, 1, 'hidden contact gets nothing'));
+  as(A, () => core.setStoryHidden('bob', false));
   now += 86_400_001;
   as(B, () => core.sweep());
   as(B, () => assert.equal(core.storyRing('alice'), null));

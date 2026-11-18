@@ -5,11 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { busy, haptic, IconBtn, notify, toast } from '../../components/ui';
+import { busy, haptic, IconBtn, notify, Row, Sheet, toast } from '../../components/ui';
 import * as core from '../../lib/core';
 import { postPhotoStory } from '../../lib/media';
 import { DISPLAY, PRESETS, presetTheme, useT, type Preset } from '../../lib/theme';
@@ -22,7 +22,12 @@ export default function NewStory() {
   const [text, setText] = useState('');
   const [bg, setBg] = useState<Preset>('aurora');
   const [photo, setPhoto] = useState<string | null>(null);
+  const [who, setWho] = useState(false);
+  const [, redraw] = useState(0);
   const ready = photo || text.trim();
+  const people = core.connected().map((id) => core.contact(id)!);
+  const seen = people.filter((c) => !c.hide).length;
+  const audience = seen === people.length ? 'All your contacts' : `${seen} of ${people.length} contacts`;
 
   const pick = async (camera: boolean) => {
     if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) return notify('Camera needed', 'Allow camera access in Settings.');
@@ -66,6 +71,7 @@ export default function NewStory() {
               onPress={() => (haptic.light(), setBg(BGS[(BGS.indexOf(bg) + 1) % BGS.length]))}
             />
           )}
+          <IconBtn name="people" color="#fff" label="Who can see" onPress={() => setWho(true)} />
           <IconBtn name="images" color="#fff" label="Pick a photo" onPress={() => pick(false)} />
           <IconBtn name="camera" color="#fff" label="Take a photo" onPress={() => pick(true)} />
         </View>
@@ -126,10 +132,11 @@ export default function NewStory() {
               }}
             />
           ) : (
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, height: 48 }}>
+            <Pressable onPress={() => setWho(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, height: 48 }}>
               <Ionicons name="people" size={16} color="rgba(255,255,255,0.85)" />
-              <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '700' }}>All your contacts · 24 hours</Text>
-            </View>
+              <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '700' }}>{audience} · 24 hours</Text>
+              <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.85)" />
+            </Pressable>
           )}
           <Pressable
             onPress={post}
@@ -151,6 +158,22 @@ export default function NewStory() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Hidden contacts stay hidden for later stories too, like WhatsApp's "My contacts except…". */}
+      <Sheet visible={who} onClose={() => setWho(false)} title="Who can see your stories">
+        <ScrollView style={{ maxHeight: 420 }}>
+          {people.map((c) => (
+            <Row
+              key={c.id}
+              title={c.label}
+              sub={c.hide ? 'Hidden' : 'Can see'}
+              onPress={() => (core.setStoryHidden(c.id, !c.hide), redraw((n) => n + 1))}
+              right={<Ionicons name={c.hide ? 'eye-off-outline' : 'checkmark-circle'} size={22} color={c.hide ? t.dim : t.accent} />}
+            />
+          ))}
+          {!people.length && <Text style={{ color: t.sub, paddingVertical: 12 }}>No contacts yet.</Text>}
+        </ScrollView>
+      </Sheet>
     </View>
   );
 }

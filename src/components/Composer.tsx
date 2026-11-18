@@ -70,6 +70,7 @@ type Props = {
   onEdit: (id: string, body: string) => void;
   onType: (v: string) => void;
   onAttach: () => void;
+  onCamera: () => void;
   onVoice: (uri: string, dur: number, wave: number[]) => void;
 };
 
@@ -262,6 +263,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(p, r
               </Pressable>
             )}
             {!editing && !v && <IconBtn name="attach" size={22} color={t.sub} label="Attach" onPress={p.onAttach} />}
+            {!editing && !v && <IconBtn name="camera-outline" size={22} color={t.sub} label="Camera" onPress={p.onCamera} />}
           </View>
         )}
         {!ready && !editing ? (

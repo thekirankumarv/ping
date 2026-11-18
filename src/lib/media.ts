@@ -20,16 +20,18 @@ function store(id: string, from: string, name: string) {
   return f.uri;
 }
 
-type Opts = { reply?: string | null; ttl?: number; quiet?: boolean; once?: boolean; body?: string };
+type Opts = { reply?: string | null; ttl?: number; quiet?: boolean; once?: 0 | 1 | 2; body?: string; hd?: boolean };
 
-async function compress(uri: string) {
+// HD keeps up to 4096 px at near-full quality; standard is 1600 px, a fraction of the size.
+async function compress(uri: string, hd = false) {
   const src = await ImageManipulator.manipulate(uri).renderAsync();
   const long = Math.max(src.width, src.height);
-  const scale = long > 1600 ? 1600 / long : 1;
+  const cap = hd ? 4096 : 1600;
+  const scale = long > cap ? cap / long : 1;
   const w = Math.round(src.width * scale);
   const h = Math.round(src.height * scale);
   const full = await ImageManipulator.manipulate(uri).resize({ width: w, height: h }).renderAsync();
-  const out = await full.saveAsync({ compress: 0.78, format: SaveFormat.JPEG });
+  const out = await full.saveAsync({ compress: hd ? 0.95 : 0.78, format: SaveFormat.JPEG });
   const tiny = await (
     await ImageManipulator.manipulate(uri).resize({ width: 24 }).renderAsync()
   ).saveAsync({ compress: 0.5, format: SaveFormat.JPEG, base64: true });
@@ -37,7 +39,7 @@ async function compress(uri: string) {
 }
 
 export async function sendImage(chat: string, uri: string, o: Opts = {}) {
-  const img = await compress(uri);
+  const img = await compress(uri, o.hd);
   const id = core.addMedia(chat, 'image', img.meta, o);
   if (!id) return;
   core.setLocal(id, store(id, img.uri, 'photo.jpg'));
@@ -54,7 +56,7 @@ export async function postPhotoStory(uri: string, caption: string) {
   try {
     const key = randomBytes(32);
     tmp.writeSync(sealBytes(key, await new File(local).bytes()));
-    for (const peer of core.connected()) {
+    for (const peer of core.storyAudience()) {
       const path = await put(tmp, peer).catch(() => null);
       if (path) core.shipStory(id, peer, { path, key: b64(key) });
     }
