@@ -6,6 +6,7 @@ const { AndroidConfig, withAndroidManifest, withAppBuildGradle, withDangerousMod
 
 const SERVICE = `package com.kiran.ping
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -23,9 +24,16 @@ class CallMessagingService : ExpoFirebaseMessagingService() {
     val nm = getSystemService(NotificationManager::class.java)
     when {
       data?.optBoolean("hush") == true -> nm.cancel(TAG, ID)
-      data?.optBoolean("call") == true -> ring(nm, remoteMessage.data["message"] ?: "Incoming call")
+      data?.optBoolean("call") == true -> if (!visible()) ring(nm, data.optString("text", "Incoming call"))
       else -> super.onMessageReceived(remoteMessage)
     }
+  }
+
+  // On screen, the app rings itself from the offer it already has.
+  private fun visible(): Boolean {
+    val info = ActivityManager.RunningAppProcessInfo()
+    ActivityManager.getMyMemoryState(info)
+    return info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
   }
 
   private fun ring(nm: NotificationManager, text: String) {

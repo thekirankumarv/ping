@@ -1,14 +1,14 @@
 import { requestRecordingPermissionsAsync } from 'expo-audio';
 import { Camera } from 'expo-camera';
 import { router } from 'expo-router';
-import { Vibration } from 'react-native';
+import { AppState, Vibration } from 'react-native';
 import InCallManager from 'react-native-incall-manager';
 import { mediaDevices, MediaStream, RTCIceCandidate, RTCPeerConnection, RTCSessionDescription } from 'react-native-webrtc';
 import { create } from 'zustand';
 import * as core from './core';
 import { randomBytes } from './crypto';
-import { clearCallAlerts, hushPush, sendPush } from './push';
-import { handleSignals, signal, useNet } from './relay';
+import { callPush, clearCallAlerts, hushPush } from './push';
+import { handleSignals, signal } from './relay';
 import { duration } from './time';
 
 type Sig =
@@ -70,6 +70,9 @@ let offer: string | null = null;
 let pending: Sig[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let pushed = false;
+let resend: ReturnType<typeof setInterval> | undefined;
+// Calls already handled here, so a resent offer can't ring again after it ended.
+const seen = new Set<string>();
 
 function send(s: Sig) {
   signal(get().peer, core.sealFor(get().peer, s));
@@ -102,8 +105,8 @@ function connect(stream: MediaStream) {
       clearTimeout(timer);
       set({ phase: 'live', started: Date.now() });
     }
-    // The other phone vanished (hung up, lost signal): give it a few seconds to come back.
-    if (p.connectionState === 'disconnected') drop = setTimeout(() => finish('Connection lost', true), 4000);
+    // The other phone vanished (lost signal): give it time to come back. Hang-ups arrive as "bye" instead.
+    if (p.connectionState === 'disconnected') drop = setTimeout(() => finish('Connection lost', true), 10_000);
     if (p.connectionState === 'failed') finish('Connection lost', true);
   });
   const ch = p.createDataChannel('ctl', { negotiated: true, id: 0 });
@@ -132,8 +135,15 @@ export async function startCall(peer: string, video: boolean) {
     InCallManager.start({ media: video ? 'video' : 'audio', ringback: '_DTMF_' });
     InCallManager.setForceSpeakerphoneOn(video);
     if (!signal(peer, core.sealFor(peer, { t: 'offer', cid, sdp: o.sdp, video } satisfies Sig))) return finish('Not reachable', true);
-    pushed = !useNet.getState().online[peer];
-    if (pushed) sendPush(core.contact(peer)?.push, core.myId(), video ? 'Incoming video call' : 'Incoming call', 'calls');
+    // Always push: "online" lags minutes behind a swiped-away app. The phone's ringer skips it if PING is on screen.
+    const token = core.contact(peer)?.push;
+    pushed = !!token;
+    callPush(token, core.myId(), video ? 'Incoming video call' : 'Incoming call');
+    // A phone woken by the push missed the first offer; keep offering (with gathered candidates) until it rings.
+    resend = setInterval(() => {
+      const sdp = pc?.localDescription?.sdp;
+      if (get().phase === 'calling' && sdp) send({ t: 'offer', cid, sdp, video });
+    }, 3000);
     timer = setTimeout(() => finish(get().phase === 'ringing' ? 'No answer' : 'Not reachable', true), RING_MS);
   } catch (e) {
     finish(e instanceof Error && (e.message === 'mic' || e.message === 'camera') ? 'Permission needed' : 'Couldn’t start call', true);
@@ -143,6 +153,7 @@ export async function startCall(peer: string, video: boolean) {
 export async function accept() {
   const c = get();
   if (c.phase !== 'incoming' || !offer) return;
+  clearTimeout(timer); // the 45 s "missed" timer from ringing
   InCallManager.stopRingtone();
   Vibration.cancel();
   set({ phase: 'connecting' });
@@ -203,6 +214,7 @@ function finish(note: string, tell: boolean, why: 'hangup' | 'decline' | 'busy' 
   if (c.phase === 'idle' || c.phase === 'ended') return;
   clearTimeout(timer);
   clearTimeout(drop);
+  clearInterval(resend);
   if (tell && c.peer) send({ t: 'end', cid: c.cid, why });
   if (tell && dc?.readyState === 'open') dc.send('bye');
   if (pushed && c.outgoing && !c.started) hushPush(core.contact(c.peer)?.push, core.myId());
@@ -234,7 +246,8 @@ async function onSig(peer: string, box: string) {
   const c = get();
   if (s.t === 'offer') {
     if (core.contact(peer)?.state !== 'ok') return;
-    if (s.cid === c.cid) return;
+    if (seen.has(s.cid)) return;
+    seen.add(s.cid);
     // A new call from the same person means their old one is over, even if its hang-up never arrived.
     if (c.phase !== 'idle' && c.phase !== 'ended') {
       if (peer !== c.peer) return signal(peer, core.sealFor(peer, { t: 'end', cid: s.cid, why: 'busy' } satisfies Sig));
@@ -244,9 +257,12 @@ async function onSig(peer: string, box: string) {
     pending = [];
     set({ ...IDLE, phase: 'incoming', cid: s.cid, peer, video: s.video, outgoing: false, speaker: s.video });
     signal(peer, core.sealFor(peer, { t: 'ring', cid: s.cid } satisfies Sig));
-    void clearCallAlerts();
-    InCallManager.startRingtone('_DEFAULT_', [0, 600, 900], 'playback', 40);
-    Vibration.vibrate([0, 600, 900], true);
+    // In the background Android blocks the app's own ring and screen; the full-screen call notification rings instead.
+    if (AppState.currentState === 'active') {
+      void clearCallAlerts();
+      InCallManager.startRingtone('_DEFAULT_', [0, 600, 900], 'playback', 40);
+      Vibration.vibrate([0, 600, 900], true);
+    }
     timer = setTimeout(() => finish('Missed', false), RING_MS);
     router.push({ pathname: '/call/[id]', params: { id: peer } });
     return;
@@ -254,11 +270,16 @@ async function onSig(peer: string, box: string) {
   if (peer !== c.peer || s.cid !== c.cid) return;
   switch (s.t) {
     case 'ring':
-      if (c.phase === 'calling') set({ phase: 'ringing' });
+      if (c.phase !== 'calling') break;
+      set({ phase: 'ringing' });
+      clearTimeout(timer);
+      timer = setTimeout(() => finish('No answer', true), RING_MS);
       break;
     case 'answer':
       InCallManager.stopRingback();
       set({ phase: 'connecting' });
+      clearTimeout(timer);
+      timer = setTimeout(() => get().phase !== 'live' && finish('Couldn’t connect', true), 30_000);
       await pc?.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: s.sdp }));
       await flushIce();
       break;
@@ -272,17 +293,8 @@ async function onSig(peer: string, box: string) {
   }
 }
 
-// A closed phone misses the first offer; resend it, with gathered candidates, once the push brings it online.
-function reoffer(online: Record<string, boolean>, before: Record<string, boolean>) {
-  const c = get();
-  const sdp = pc?.localDescription?.sdp;
-  if (c.phase !== 'calling' || !sdp || !online[c.peer] || before[c.peer]) return;
-  send({ t: 'offer', cid: c.cid, sdp, video: c.video });
-  clearTimeout(timer);
-  timer = setTimeout(() => finish(get().phase === 'ringing' ? 'No answer' : 'Not reachable', true), RING_MS);
-}
-
 export function startCalls() {
   handleSignals((peer, box) => void onSig(peer, box));
-  useNet.subscribe((s, prev) => reoffer(s.online, prev.online));
+  // Opened from the call notification: the screen is up, so its ringtone can stop.
+  AppState.addEventListener('change', (st) => st === 'active' && get().phase === 'incoming' && void clearCallAlerts());
 }

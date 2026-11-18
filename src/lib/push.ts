@@ -40,12 +40,23 @@ export async function registerPush(): Promise<string | null> {
 }
 
 // Content-free on purpose: the message itself stays encrypted in the relay.
-export function sendPush(to: string | null | undefined, chat: string, body = 'New message', channelId = 'messages') {
+export function sendPush(to: string | null | undefined, chat: string, body = 'New message') {
   if (!to) return;
   fetch('https://exp.host/--/api/v2/push/send', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ to, title: 'PING', body, channelId, priority: 'high', sound: 'default', data: { chat, call: channelId === 'calls' } }),
+    body: JSON.stringify({ to, title: 'PING', body, channelId: 'messages', priority: 'high', sound: 'default', data: { chat } }),
+  }).catch(() => {});
+}
+
+// Data-only on purpose: a push with a title is shown by Android itself while PING is closed (one beep),
+// a data-only one reaches the native ringer (plugins/call-ring.js), which rings until answered.
+export function callPush(to: string | null | undefined, chat: string, text: string) {
+  if (!to) return;
+  fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ to, priority: 'high', data: { chat, call: true, text } }),
   }).catch(() => {});
 }
 
